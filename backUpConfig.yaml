@@ -1,0 +1,70 @@
+trigger: none  # No se ejecuta automáticamente por commits
+
+schedules:  # Programa la ejecución el primer día de cada mes
+  - cron: "0 0 1 * *"  # A medianoche del primer día de cada mes
+    displayName: Monthly Backup
+    branches:
+      include:
+        - "*"
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+stages:
+  - stage: Backup_All_Repos
+    displayName: "Monthly Backup of All Repositories"
+    jobs:
+      - job: BackupRepos
+        displayName: "Backup All Repositories"
+        steps:
+          # Crear Backups
+          - script: |
+              repo_urls=(
+                "https://$(GIT_PAT)@dev.azure.com/consware-gasdata/Gestión%20Gasdata/_git/BackOffice40Middleware"
+                "https://$(GIT_PAT)@dev.azure.com/consware-gasdata/Gestión%20Gasdata/_git/BO40-AppMovil"
+                "https://$(GIT_PAT)@dev.azure.com/consware-gasdata/Gestión%20Gasdata/_git/BO40-CW-Printer-Redeban"
+                "https://$(GIT_PAT)@dev.azure.com/consware-gasdata/Gestión%20Gasdata/_git/BO40-SaleRecovery"
+                "https://$(GIT_PAT)@dev.azure.com/consware-gasdata/Gestión%20Gasdata/_git/COL-Independientes-BO40-Consumer"
+                "https://$(GIT_PAT)@dev.azure.com/consware-gasdata/Gestión%20Gasdata/_git/COL-Texaco-BO40-Consumer"
+                "https://$(GIT_PAT)@dev.azure.com/consware-gasdata/Gestión%20Gasdata/_git/COL-Texaco-BO40-WebApi"
+                "https://$(GIT_PAT)@dev.azure.com/consware-gasdata/Gestión%20Gasdata/_git/COL-Vanti-BO40-Consumer"
+                "https://$(GIT_PAT)@dev.azure.com/consware-gasdata/Gestión%20Gasdata/_git/COL-Vanti-BO40-WebAPI"
+                "https://$(GIT_PAT)@dev.azure.com/consware-gasdata/Gestión%20Gasdata/_git/MEX-CDC-Front"
+                "https://$(GIT_PAT)@dev.azure.com/consware-gasdata/Gestión%20Gasdata/_git/MEX-CDC-WebAPI"
+                "https://$(GIT_PAT)@dev.azure.com/consware-gasdata/Gestión%20Gasdata/_git/MEX-Independientes-BO40-Consumer"
+                "https://$(GIT_PAT)@dev.azure.com/consware-gasdata/Gestión%20Gasdata/_git/TI-40-TI-FIRMWARE"
+                "https://$(GIT_PAT)@dev.azure.com/consware-gasdata/Gestión%20Gasdata/_git/TI-40-TI-HARDWARE"
+                "https://$(GIT_PAT)@dev.azure.com/consware-gasdata/Gestión%20Gasdata/_git/TI-50"
+                "https://$(GIT_PAT)@dev.azure.com/consware-gasdata/Gestión%20Gasdata/_git/TI-BOOTLOADER-TI-FIRMWARE"
+                "https://$(GIT_PAT)@dev.azure.com/consware-gasdata/Gestión%20Gasdata/_git/TI-GAS-TI-FIRMWARE"
+                "https://$(GIT_PAT)@dev.azure.com/consware-gasdata/Gestión%20Gasdata/_git/TI-LEGACY-FIRMWARE"
+                "https://$(GIT_PAT)@dev.azure.com/consware-gasdata/Gestión%20Gasdata/_git/TI-LEGACY-HARDWARE"
+                "https://$(GIT_PAT)@dev.azure.com/consware-gasdata/Gestión%20Gasdata/_git/TI-LIQUID-TI-FIRMWARE"
+                "https://$(GIT_PAT)@dev.azure.com/consware-gasdata/Gestión%20Gasdata/_git/TI-MEXICO-NATGAS-OASIS-FIRMWARE"
+                "https://$(GIT_PAT)@dev.azure.com/consware-gasdata/Gestión%20Gasdata/_git/TI-MRU-FIRMWARE"
+                "https://$(GIT_PAT)@dev.azure.com/consware-gasdata/Gestión%20Gasdata/_git/WIRELESS-READER-FIRMWARE"
+                "https://$(GIT_PAT)@dev.azure.com/consware-gasdata/Gestión%20Gasdata/_git/WIRELESS-READER-HARDWARE"
+              )
+
+              BACKUP_FOLDER="backups_$(date +%Y-%m-%d)"
+              mkdir -p $BACKUP_FOLDER
+
+              for repo in "${repo_urls[@]}"; do
+                repo_name=$(basename $repo)
+                echo "Cloning $repo_name..."
+                git clone $repo $repo_name
+                echo "Creating backup for $repo_name..."
+                zip -r "$BACKUP_FOLDER/${repo_name}_backup.zip" $repo_name
+                rm -rf $repo_name
+              done
+
+              echo "Backups created in folder: $BACKUP_FOLDER"
+            displayName: "Clone Repos and Create Backups"
+
+          # Publicar la carpeta completa como artefacto
+          - task: PublishBuildArtifacts@1
+            inputs:
+              PathtoPublish: 'backups_$(date +%Y-%m-%d)'
+              ArtifactName: 'Monthly_Backups_$(Build.BuildId)'
+              publishLocation: 'Container'
+            displayName: "Publish Backup Folder as Artifact"

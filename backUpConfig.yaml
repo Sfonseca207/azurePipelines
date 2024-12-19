@@ -17,14 +17,17 @@ stages:
       - job: BackupRepos
         displayName: "Backup All Repositories"
         steps:
-          # Paso 1: Configurar la fecha en una variable
+          # Paso 1: Configurar la fecha y nombre del artefacto
           - script: |
               BACKUP_DATE=$(date +%Y-%m-%d)
               BACKUP_FOLDER="Backup_global_$BACKUP_DATE"
+              ARTIFACT_NAME="BackupGlobal_$BACKUP_DATE"
               echo "##vso[task.setvariable variable=BACKUP_DATE]$BACKUP_DATE"
               echo "##vso[task.setvariable variable=BACKUP_FOLDER]$BACKUP_FOLDER"
+              echo "##vso[task.setvariable variable=ARTIFACT_NAME]$ARTIFACT_NAME"
               echo "Backup folder will be named: $BACKUP_FOLDER"
-            displayName: "Set Backup Folder Name"
+              echo "Artifact will be named: $ARTIFACT_NAME"
+            displayName: "Set Backup Folder and Artifact Name"
 
           # Paso 2: Clonar los repositorios y crear backups
           - script: |
@@ -72,6 +75,6 @@ stages:
           - task: PublishBuildArtifacts@1
             inputs:
               PathtoPublish: '$(BACKUP_FOLDER)'
-              ArtifactName: 'Weekly_Backups_$(Build.BuildId)'
+              ArtifactName: '$(ARTIFACT_NAME)'
               publishLocation: 'Container'
             displayName: "Publish Backup Folder as Artifact"

@@ -1,8 +1,8 @@
 trigger: none  # No se ejecuta automáticamente por commits
 
-schedules:  # Programa la ejecución el primer día de cada mes
-  - cron: "0 0 1 * *"  # A medianoche del primer día de cada mes
-    displayName: Monthly Backup
+schedules:  # Programa la ejecución semanal, los domingos a las 11:59 p.m.
+  - cron: "59 23 * * 0"  # A las 11:59 p.m. todos los domingos
+    displayName: Weekly Backup
     branches:
       include:
         - "*"
@@ -12,7 +12,7 @@ pool:
 
 stages:
   - stage: Backup_All_Repos
-    displayName: "Monthly Backup of All Repositories"
+    displayName: "Weekly Backup of All Repositories"
     jobs:
       - job: BackupRepos
         displayName: "Backup All Repositories"
@@ -20,9 +20,11 @@ stages:
           # Paso 1: Configurar la fecha en una variable
           - script: |
               BACKUP_DATE=$(date +%Y-%m-%d)
+              BACKUP_FOLDER="Backup_global_$BACKUP_DATE"
               echo "##vso[task.setvariable variable=BACKUP_DATE]$BACKUP_DATE"
-              echo "Backup date set to: $BACKUP_DATE"
-            displayName: "Set Backup Date"
+              echo "##vso[task.setvariable variable=BACKUP_FOLDER]$BACKUP_FOLDER"
+              echo "Backup folder will be named: $BACKUP_FOLDER"
+            displayName: "Set Backup Folder Name"
 
           # Paso 2: Clonar los repositorios y crear backups
           - script: |
@@ -53,24 +55,23 @@ stages:
                 "https://$(GIT_PAT)@dev.azure.com/consware-gasdata/Gestión%20Gasdata/_git/WIRELESS-READER-HARDWARE"
               )
 
-              BACKUP_FOLDER="backups_$(BACKUP_DATE)"
-              mkdir -p $BACKUP_FOLDER
+              mkdir -p $(BACKUP_FOLDER)
 
               for repo in "${repo_urls[@]}"; do
                 repo_name=$(basename $repo)
                 echo "Cloning $repo_name..."
                 git clone --depth 1 $repo $repo_name
-                zip -r "$BACKUP_FOLDER/${repo_name}_backup.zip" $repo_name
+                zip -r "$(BACKUP_FOLDER)/${repo_name}_backup.zip" $repo_name
                 rm -rf $repo_name
               done
 
-              echo "Backups created in folder: $BACKUP_FOLDER"
+              echo "Backups created in folder: $(BACKUP_FOLDER)"
             displayName: "Clone Repos and Create Backups"
 
           # Paso 3: Publicar la carpeta de backups como artefacto
           - task: PublishBuildArtifacts@1
             inputs:
-              PathtoPublish: 'backups_$(BACKUP_DATE)'
-              ArtifactName: 'Monthly_Backups_$(Build.BuildId)'
+              PathtoPublish: '$(BACKUP_FOLDER)'
+              ArtifactName: 'Weekly_Backups_$(Build.BuildId)'
               publishLocation: 'Container'
             displayName: "Publish Backup Folder as Artifact"
